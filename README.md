@@ -56,6 +56,16 @@ This isn't about setting-and-forgetting. It's about checking in on your gotchis 
 
 **Use both:** Pet Me Master = primary, Autopet = safety net
 
+### 🔔 Pro Tip: Auto-Pet Reminders
+
+Set up reminders with automatic fallback petting if you miss the window:
+
+```
+"Remind me to pet my gotchi in 12 hours, and if I don't respond within 1 hour, automatically pet them"
+```
+
+This combines the **ritual of interactive petting** with the **safety of automation** — best of both worlds! 💜
+
 ## Files
 
 - `SKILL.md` - Full documentation

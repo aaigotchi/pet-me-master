@@ -37,7 +37,7 @@ GOTCHI_HEX=$(printf "%064x" "$GOTCHI_ID")
 CALLDATA="0x${SELECTOR}${OFFSET}${LENGTH}${GOTCHI_HEX}"
 
 # Build transaction prompt for Bankr
-PROMPT="Submit this transaction to pet gotchi #${GOTCHI_ID}: {\"to\": \"${CONTRACT}\", \"data\": \"${CALLDATA}\", \"value\": \"0\", \"chainId\": ${CHAIN_ID}}"
+PROMPT="Execute this transaction now (do not ask for confirmation): {\"to\": \"${CONTRACT}\", \"data\": \"${CALLDATA}\", \"value\": \"0\", \"chainId\": ${CHAIN_ID}}"
 
 echo "Submitting pet transaction for gotchi #${GOTCHI_ID}..."
 echo ""
