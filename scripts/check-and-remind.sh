@@ -7,7 +7,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="$HOME/.openclaw/workspace/skills/pet-me-master/config.json"
 STATE_FILE="$HOME/.openclaw/workspace/skills/pet-me-master/reminder-state.json"
-BANKR_SCRIPT="$HOME/.openclaw/skills/bankr/scripts/bankr.sh"
+REMINDER_FILE="$HOME/.openclaw/workspace/.gotchi-reminder.txt"
 
 # Load config
 GOTCHI_IDS=($(jq -r '.gotchiIds[]' "$CONFIG_FILE"))
@@ -26,7 +26,7 @@ for GOTCHI_ID in "${GOTCHI_IDS[@]}"; do
   DATA=$(cast call "$CONTRACT" "getAavegotchi(uint256)" "$GOTCHI_ID" --rpc-url "$RPC_URL" 2>/dev/null)
   
   if [ -z "$DATA" ]; then
-    echo "Failed to query gotchi #$GOTCHI_ID"
+    echo "[$(date)] Failed to query gotchi #$GOTCHI_ID"
     ALL_READY=false
     continue
   fi
@@ -56,32 +56,37 @@ fi
 TIME_SINCE_REMINDER=$((NOW - LAST_REMINDER))
 
 if [ "$ALL_READY" = true ] && [ $TIME_SINCE_REMINDER -gt 43200 ] && [ "$FALLBACK_SCHEDULED" = false ]; then
-  echo "All gotchis ready! Sending reminder..."
+  echo "[$(date)] All gotchis ready! Creating reminder file..."
   
-  # Send reminder via OpenClaw message system
-  # Using a system event that will reach the user
-  MESSAGE="fren, pet your gotchi(s)! 👻 All ${#GOTCHI_IDS[@]} gotchis are ready for petting. Reply with 'pet all my gotchis' or I'll auto-pet them in 1 hour if you're busy! 🦞"
+  # Write reminder file for AAI to pick up on next heartbeat
+  cat > "$REMINDER_FILE" << EOF
+fren, pet your gotchi(s)! 👻
+
+All ${#GOTCHI_IDS[@]} gotchis are ready for petting!
+
+Reply with 'pet all my gotchis' or I'll auto-pet them in 1 hour if you're busy! 🦞
+EOF
   
-  # Send via Telegram (assuming that's your main channel)
-  # This will appear in your chat with AAI
-  echo "$MESSAGE" | "$BANKR_SCRIPT" "Send this message to the user via their messaging platform: $MESSAGE" || true
+  echo "[$(date)] ✅ Reminder file created"
   
   # Update state: mark reminder sent and schedule fallback
   jq '.lastReminder = '$(date +%s)' | .fallbackScheduled = true' "$STATE_FILE" > "${STATE_FILE}.tmp" && mv "${STATE_FILE}.tmp" "$STATE_FILE"
   
-  # Schedule auto-pet fallback in 1 hour using at command
+  # Schedule auto-pet fallback in 1 hour
   echo "bash $SCRIPT_DIR/auto-pet-fallback.sh" | at now + 1 hour 2>/dev/null || {
-    # If 'at' not available, use openclaw cron wake system
-    # This will trigger in 1 hour
-    sleep 3600 && bash "$SCRIPT_DIR/auto-pet-fallback.sh" &
+    # If 'at' not available, use background sleep
+    (sleep 3600 && bash "$SCRIPT_DIR/auto-pet-fallback.sh" >> /tmp/auto-pet-fallback.log 2>&1) &
+    FALLBACK_PID=$!
+    echo "[$(date)] Fallback scheduled via background process (PID $FALLBACK_PID)"
   }
   
-  echo "✅ Reminder sent, fallback scheduled for 1 hour"
+  echo "[$(date)] ✅ Fallback scheduled for 1 hour from now"
   
 elif [ "$ALL_READY" = false ] && [ "$FALLBACK_SCHEDULED" = true ]; then
   # Reset state if gotchis were already petted
-  echo "Gotchis already petted, resetting state"
+  echo "[$(date)] Gotchis already petted, resetting state"
   echo '{"lastReminder": 0, "fallbackScheduled": false}' > "$STATE_FILE"
+  rm -f "$REMINDER_FILE"
 fi
 
 exit 0
