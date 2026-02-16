@@ -2,8 +2,14 @@
   "contractAddress": "0xA99c4B08201F2913Db8D28e71d020c4298F29dBF",
   "rpcUrl": "https://mainnet.base.org",
   "chainId": 8453,
-  "gotchiIds": ["9638"],
+  "gotchiIds": [
+    "9638",
+    "21785",
+    "10052"
+  ],
   "streakTracking": true,
-  "dailyReminder": false,
-  "reminderTime": "09:00"
+  "dailyReminder": true,
+  "reminderTime": "09:00",
+  "autoFallback": true,
+  "fallbackDelayHours": 1
 }
