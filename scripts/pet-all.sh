@@ -94,9 +94,9 @@ echo ""
 
 # Build batch calldata
 # Function: interact(uint256[])
-# Selector: 0xbafa9107
+# Selector: 0x22c67519
 
-SELECTOR="bafa9107"
+SELECTOR="22c67519"
 
 # Offset to array data (32 bytes = 0x20)
 OFFSET="0000000000000000000000000000000000000000000000000000000000000020"

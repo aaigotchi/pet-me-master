@@ -8,9 +8,10 @@ metadata:
       bins:
         - cast
         - jq
-      env:
-        - BANKR_API_KEY
-    primaryEnv: BANKR_API_KEY
+      skills:
+        - bankr
+      files:
+        - ~/.openclaw/skills/bankr/config.json
 ---
 
 # Pet Me Master 👻💜
@@ -52,29 +53,12 @@ AAI: "⏰ Wait 4h 23m! Last pet was 11:15am"
 ## How It Works
 
 1. **You ask to pet**
-2. **I check on-chain** (`lastInteracted` timestamp)
+2. **I check on-chain** (`lastInteracted` timestamp via cast call)
 3. **Calculate cooldown** (12h 1min = 43260 seconds)
-4. **If ready** → Execute via aavegotchi skill (Foundry cast)
+4. **If ready** → Build and submit transaction via Bankr API (secure remote signing)
 5. **If not ready** → Show countdown + next time
 
-## ⚠️ Important Note: Bankr Integration
-
-**Current Status:** The Bankr wallet integration for petting is **not reliable**.
-
-**Issue:** Bankr's API returns "I don't have enough verified information" when attempting to execute `interact()` calls on the Aavegotchi contract. The transactions appear to submit but don't actually execute on-chain.
-
-**Workaround:** The `pet-via-bankr.sh` script now **automatically falls back** to the proven working method (Foundry `cast` with private key from the aavegotchi skill).
-
-**What this means for you:**
-- ✅ Petting still works perfectly
-- ✅ Uses the aavegotchi skill under the hood
-- ⚠️ Requires aavegotchi skill to be installed and configured with private key
-- 🔄 We'll re-enable true Bankr integration once the API supports Aavegotchi contract calls
-
-**To use:**
-- Ensure `aavegotchi` skill is installed in your workspace
-- Configure private key at `~/.openclaw/skills/aavegotchi/config.json`
-- Pet commands will work seamlessly via the fallback
+**Security:** All petting transactions are signed remotely by Bankr. No private keys are used or stored by this skill.
 
 ## Setup
 
@@ -92,23 +76,19 @@ Create `~/.openclaw/workspace/skills/pet-me-master/config.json`:
 }
 ```
 
-### 2. Install Aavegotchi Skill (Required)
+### 2. Configure Bankr
 
-Since Bankr integration isn't working yet, you need the aavegotchi skill:
+Ensure you have the Bankr skill installed and configured with your API key at:
+`~/.openclaw/skills/bankr/config.json`
 
-```bash
-# The aavegotchi skill should be in your workspace
-ls ~/.openclaw/workspace/skills/aavegotchi/
-```
-
-Configure it with your private key (see aavegotchi skill README).
+See the [Bankr skill documentation](https://clawhub.com/skills/bankr) for setup instructions.
 
 ### 3. Dependencies
 
 **Required:**
-- `cast` (Foundry) - for on-chain reads AND petting
-- `jq` - for JSON parsing
-- `aavegotchi` skill installed and configured
+- `cast` (Foundry) - for on-chain cooldown checks
+- `jq` - for JSON parsing  
+- `bankr` skill - for secure transaction signing
 
 **Install Foundry:**
 ```bash
@@ -422,6 +402,10 @@ LFGOTCHi! 🦞🚀
 - ✅ **API key authentication** - Uses Bankr API key from config
 - ✅ **Transaction simulation** - Bankr validates before execution
 - ✅ **Audit trail** - All transactions logged by Bankr
+- ✅ **Auto-pet via Bankr** - Optional auto-fallback uses same secure Bankr method
+
+### About Auto-Pet Fallback
+The optional `auto-pet-fallback.sh` script (triggered by cron reminders) simply calls `pet-via-bankr.sh` automatically if you don't respond to a reminder within 1 hour. It uses the SAME secure Bankr signing method - no additional security risk. This is an opt-in feature for convenience.
 
 ### What Changed (Security Fix)
 **v1.1.0 (INSECURE - ClawHub Flagged):**
