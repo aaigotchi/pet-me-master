@@ -1,13 +1,15 @@
 #!/bin/bash
 set -e
 
-# Check if all gotchis are ready and send reminder if needed
+# Check if all gotchis are ready and send DIRECT Telegram notification
 # This script runs every 30 minutes via cron
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="$HOME/.openclaw/workspace/skills/pet-me-master/config.json"
 STATE_FILE="$HOME/.openclaw/workspace/skills/pet-me-master/reminder-state.json"
-REMINDER_FILE="$HOME/.openclaw/workspace/.gotchi-reminder.txt"
+
+# Your Telegram chat ID
+TELEGRAM_CHAT_ID="322059822"
 
 # Load config
 GOTCHI_IDS=($(jq -r '.gotchiIds[]' "$CONFIG_FILE"))
@@ -20,6 +22,7 @@ REQUIRED_WAIT=43260
 # Check if all gotchis are ready
 ALL_READY=true
 NOW=$(date +%s)
+READY_COUNT=0
 
 for GOTCHI_ID in "${GOTCHI_IDS[@]}"; do
   # Get last pet time from blockchain
@@ -36,9 +39,10 @@ for GOTCHI_ID in "${GOTCHI_IDS[@]}"; do
   LAST_PET_DEC=$((16#$LAST_PET_HEX))
   TIME_SINCE=$((NOW - LAST_PET_DEC))
   
-  if [ $TIME_SINCE -lt $REQUIRED_WAIT ]; then
+  if [ $TIME_SINCE -ge $REQUIRED_WAIT ]; then
+    READY_COUNT=$((READY_COUNT + 1))
+  else
     ALL_READY=false
-    break
   fi
 done
 
@@ -56,28 +60,42 @@ fi
 TIME_SINCE_REMINDER=$((NOW - LAST_REMINDER))
 
 if [ "$ALL_READY" = true ] && [ $TIME_SINCE_REMINDER -gt 43200 ] && [ "$FALLBACK_SCHEDULED" = false ]; then
-  echo "[$(date)] All gotchis ready! Sending immediate notification..."
+  echo "[$(date)] All gotchis ready! Sending DIRECT Telegram notification..."
   
-  # Send IMMEDIATE notification via message tool (bypasses heartbeat delay)
-  # This triggers a direct Telegram message
-  export PATH="$HOME/.foundry/bin:/usr/local/bin:$PATH"
-  
-  # Create notification message
-  NOTIFY_MSG="fren, pet your gotchi(s)! 👻
+  # Send direct Telegram notification via Bankr
+  MESSAGE="🐾 **PET TIME!** 👻
 
-All ${#GOTCHI_IDS[@]} gotchis are ready for petting.
+All ${#GOTCHI_IDS[@]} gotchis are ready for petting!
 
-Reply with 'pet all my gotchis' or I'll auto-pet them in 1 hour if you're busy! 🦞"
+Gotchis: #${GOTCHI_IDS[0]}, #${GOTCHI_IDS[1]}, #${GOTCHI_IDS[2]}
 
-  # Write to special immediate-notification file
-  echo "$NOTIFY_MSG" > "$HOME/.openclaw/workspace/.pet-reminder-immediate.txt"
+Reply with 'pet all my gotchis' or I'll auto-pet them in 1 hour if you're busy! 🦞
+
+⏰ Next auto-pet: $(date -u -d "+1 hour" '+%H:%M UTC')"
+
+  # Use Bankr to send message
+  BANKR_RESPONSE=$(curl -s -X POST "https://api.bankr.bot/agent/submit" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer ${BANKR_API_KEY}" \
+    -d "{
+      \"prompt\": \"Send this message to Telegram chat ID $TELEGRAM_CHAT_ID: $MESSAGE\"
+    }" 2>&1)
   
-  # Also keep the old method as fallback
-  cat > "$REMINDER_FILE" << EOF
-$NOTIFY_MSG
-EOF
-  
-  echo "[$(date)] ✅ Immediate notification triggered"
+  if echo "$BANKR_RESPONSE" | grep -q "success"; then
+    echo "[$(date)] ✅ Telegram notification sent via Bankr"
+  else
+    echo "[$(date)] ⚠️  Bankr notification may have failed, using fallback method..."
+    
+    # Fallback: Try using OpenClaw gateway message tool via curl
+    curl -s -X POST "http://localhost:3000/api/message" \
+      -H "Content-Type: application/json" \
+      -d "{
+        \"action\": \"send\",
+        \"channel\": \"telegram\",
+        \"target\": \"$TELEGRAM_CHAT_ID\",
+        \"message\": \"$MESSAGE\"
+      }" >> /tmp/pet-reminder-fallback.log 2>&1 || echo "[$(date)] Fallback also failed"
+  fi
   
   # Update state: mark reminder sent and schedule fallback
   jq '.lastReminder = '$(date +%s)' | .fallbackScheduled = true' "$STATE_FILE" > "${STATE_FILE}.tmp" && mv "${STATE_FILE}.tmp" "$STATE_FILE"
@@ -90,13 +108,12 @@ EOF
     echo "[$(date)] Fallback scheduled via background process (PID $FALLBACK_PID)"
   }
   
-  echo "[$(date)] ✅ Fallback scheduled for 1 hour from now"
+  echo "[$(date)] ✅ Auto-pet fallback scheduled for 1 hour from now"
   
 elif [ "$ALL_READY" = false ] && [ "$FALLBACK_SCHEDULED" = true ]; then
   # Reset state if gotchis were already petted
   echo "[$(date)] Gotchis already petted, resetting state"
   echo '{"lastReminder": 0, "fallbackScheduled": false}' > "$STATE_FILE"
-  rm -f "$REMINDER_FILE"
 fi
 
 exit 0
