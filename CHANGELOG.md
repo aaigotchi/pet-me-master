@@ -1,5 +1,9 @@
 # Changelog - pet-me-master
 
+## [2.0.2] - 2026-02-22 - Flawless Edition Update
+
+Re-release with complete documentation and GitHub sync.
+
 ## [2.0.1] - 2026-02-22 - Flawless Edition
 
 ### Added
